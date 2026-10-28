@@ -1,0 +1,341 @@
+<!DOCTYPE html><html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ESP32 Smart Home Control</title><style>
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    padding: 20px;
+    font-family: Arial, sans-serif;
+    background: #eef2f7;
+    color: #172033;
+}
+
+.container {
+    max-width: 520px;
+    margin: auto;
+}
+
+header {
+    text-align: center;
+    margin-bottom: 25px;
+}
+
+header h1 {
+    color: #1456c0;
+    font-size: 27px;
+}
+
+header p {
+    color: #596579;
+}
+
+.card {
+    background: white;
+    padding: 20px;
+    border-radius: 16px;
+    margin-bottom: 18px;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.07);
+}
+
+.card h2 {
+    margin-top: 0;
+    font-size: 19px;
+}
+
+#voiceButton {
+    width: 100%;
+    padding: 17px;
+    border: none;
+    border-radius: 12px;
+    background: #1456c0;
+    color: white;
+    font-size: 18px;
+    font-weight: bold;
+}
+
+#voiceButton:disabled {
+    background: #888;
+}
+
+#recognized {
+    min-height: 45px;
+    margin-top: 15px;
+    padding: 12px;
+    border-radius: 8px;
+    background: #f0f4fa;
+    overflow-wrap: anywhere;
+}
+
+.device {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 13px 0;
+    border-bottom: 1px solid #e5e9f0;
+}
+
+.device:last-child {
+    border-bottom: none;
+}
+
+.device-name {
+    font-weight: bold;
+}
+
+.device-state {
+    font-size: 13px;
+    color: #667085;
+    margin-top: 5px;
+}
+
+.controls {
+    display: flex;
+    gap: 8px;
+}
+
+button.control {
+    border: none;
+    padding: 10px 13px;
+    border-radius: 8px;
+    color: white;
+    font-weight: bold;
+}
+
+.on {
+    background: #16834a;
+}
+
+.off {
+    background: #c0392b;
+}
+
+#status {
+    padding: 12px;
+    border-radius: 8px;
+    background: #f0f4fa;
+    overflow-wrap: anywhere;
+}
+
+.note {
+    font-size: 13px;
+    color: #596579;
+    line-height: 1.6;
+}
+</style></head><body>
+<div class="container"><header>
+    <h1>Smart Home Control</h1>
+    <p>ESP32-S3 Voice-Controlled Home Automation</p>
+</header><section class="card">
+    <h2>🎙️ Voice Control</h2>
+    <p>Tap the microphone button and speak a command.</p><button id="voiceButton" onclick="startListening()">
+    🎤 Start Voice Control
+</button>
+
+<div id="recognized">
+    Your spoken command will appear here.
+</div>
+
+</section><section class="card">
+    <h2>🏠 Manual Controls</h2><div class="device">
+    <div>
+        <div class="device-name">💡 Light</div>
+        <div class="device-state" id="lightState">Status: Unknown</div>
+    </div>
+    <div class="controls">
+        <button class="control on" onclick="controlDevice('V0',1,'light')">ON</button>
+        <button class="control off" onclick="controlDevice('V0',0,'light')">OFF</button>
+    </div>
+</div>
+
+<div class="device">
+    <div>
+        <div class="device-name">🔌 Socket</div>
+        <div class="device-state" id="socketState">Status: Unknown</div>
+    </div>
+    <div class="controls">
+        <button class="control on" onclick="controlDevice('V1',1,'socket')">ON</button>
+        <button class="control off" onclick="controlDevice('V1',0,'socket')">OFF</button>
+    </div>
+</div>
+
+<div class="device">
+    <div>
+        <div class="device-name">🌀 Smart Fan</div>
+        <div class="device-state" id="fanState">Status: Unknown</div>
+    </div>
+    <div class="controls">
+        <button class="control on" onclick="controlDevice('V2',1,'fan')">ON</button>
+        <button class="control off" onclick="controlDevice('V2',0,'fan')">OFF</button>
+    </div>
+</div>
+
+</section><section class="card">
+    <h2>Connection Status</h2>
+    <div id="status">Dashboard loaded. Blynk connection has not been configured yet.</div>
+</section><section class="card">
+    <h2>Available Voice Commands</h2>
+    <p class="note">
+        • Turn on the light<br>
+        • Turn off the light<br>
+        • Turn on the socket<br>
+        • Turn off the socket<br>
+        • Turn on the smart fan<br>
+        • Turn off the smart fan<br>
+        • Turn off everything
+    </p>
+</section></div><script>
+/*
+  SECURITY:
+  This webpage must communicate with a secure backend.
+  Never put your Blynk Auth Token in this file.
+
+  We will configure the backend URL in the next step.
+*/
+const BACKEND_URL = "REPLACE_WITH_YOUR_SECURE_BACKEND_URL";
+
+const deviceNames = {
+    V0: "light",
+    V1: "socket",
+    V2: "fan"
+};
+
+function setStatus(message) {
+    document.getElementById("status").textContent = message;
+}
+
+function updateDeviceState(device, value) {
+    const element = document.getElementById(device + "State");
+    element.textContent = "Status: " + (value ? "ON" : "OFF");
+}
+
+async function controlDevice(pin, value, device) {
+    if (BACKEND_URL.startsWith("REPLACE_")) {
+        setStatus("The dashboard is ready, but the secure Blynk connection must be configured in the next step.");
+        return;
+    }
+
+    setStatus("Sending command...");
+
+    try {
+        const response = await fetch(BACKEND_URL, {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({pin: pin, value: value})
+        });
+
+        if (!response.ok) {
+            throw new Error("The server returned an error.");
+        }
+
+        updateDeviceState(device, value);
+        setStatus("Command sent successfully. Confirm the device responds.");
+    } catch (error) {
+        setStatus("Could not send command. Check your internet connection and backend setup.");
+    }
+}
+
+function normalize(text) {
+    return text.toLowerCase()
+        .replace(/[.,!?]/g, "")
+        .replace(/\s+/g, " ")
+        .trim();
+}
+
+async function processVoiceCommand(rawText) {
+    const text = normalize(rawText);
+    document.getElementById("recognized").textContent =
+        "Recognized: " + rawText;
+
+    if (
+        text.includes("turn off everything") ||
+        text.includes("turn everything off") ||
+        text.includes("switch off everything")
+    ) {
+        await controlDevice("V0", 0, "light");
+        await controlDevice("V1", 0, "socket");
+        await controlDevice("V2", 0, "fan");
+        return;
+    }
+
+    let device = null;
+    let pin = null;
+
+    if (text.includes("light")) {
+        device = "light";
+        pin = "V0";
+    } else if (text.includes("socket")) {
+        device = "socket";
+        pin = "V1";
+    } else if (
+        text.includes("fan") ||
+        text.includes("smart fan")
+    ) {
+        device = "fan";
+        pin = "V2";
+    }
+
+    if (!device) {
+        setStatus("Device not recognized. Say light, socket, or smart fan.");
+        return;
+    }
+
+    const wantsOn =
+        /\b(turn on|switch on|switch on the|switch on my|turn on the|turn on my|activate|start)\b/.test(text);
+
+    const wantsOff =
+        /\b(turn off|switch off|switch off the|switch off my|deactivate|stop)\b/.test(text);
+
+    if (wantsOn && !wantsOff) {
+        await controlDevice(pin, 1, device);
+    } else if (wantsOff && !wantsOn) {
+        await controlDevice(pin, 0, device);
+    } else {
+        setStatus("Please say turn on or turn off, followed by the device name.");
+    }
+}
+
+function startListening() {
+    const SpeechRecognition =
+        window.SpeechRecognition || window.webkitSpeechRecognition;
+
+    if (!SpeechRecognition) {
+        setStatus("Voice recognition is not supported by this browser. Try Google Chrome on Android.");
+        return;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.lang = "en-NG";
+    recognition.continuous = false;
+    recognition.interimResults = false;
+
+    const button = document.getElementById("voiceButton");
+
+    recognition.onstart = function() {
+        button.textContent = "🎙️ Listening...";
+        setStatus("Listening. Speak your command now.");
+    };
+
+    recognition.onresult = function(event) {
+        const spokenText = event.results[0][0].transcript;
+        processVoiceCommand(spokenText);
+    };
+
+    recognition.onerror = function(event) {
+        setStatus("Voice recognition error: " + event.error +
+                  ". Check microphone permission and internet access.");
+    };
+
+    recognition.onend = function() {
+        button.textContent = "🎤 Start Voice Control";
+    };
+
+    recognition.start();
+}
+</script></body>
+</html>
